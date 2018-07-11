@@ -4,6 +4,8 @@ services:
   plex:
     image: plexinc/pms-docker
     container_name: plex
+    networks: 
+      - docker
     volumes:
       - /data/appdata/plex:/config
       - /data/storage:/data
@@ -30,13 +32,13 @@ services:
   tautulli:
     image: tautulli/tautulli
     container_name: tautulli
+    networks:
+      -  docker
     depends_on:
       - plex
     volumes:
       - /data/appdata/tautulli:/config
       - /data/appdata/plex/Library/Application\ Support/Plex\ Media\ Server/Logs:/logs:ro
-    ports:
-      - 8181:8181
     restart: always
     environment:
       - PUID=${PUID}
@@ -45,6 +47,8 @@ services:
   ombi:
     image: linuxserver/ombi
     container_name: ombi
+    networks: 
+      - docker
     depends_on:
       - plex
     volumes:
@@ -53,7 +57,7 @@ services:
       - /data/storage/movies:/movies
       - /data/storage/anime:/anime
     ports:
-      - 3000:3000
+      - 3579:3579
     restart: always
     environment:
       - PUID=${PUID}
@@ -62,6 +66,8 @@ services:
   nzbget:
     image: linuxserver/nzbget
     container_name: nzbget
+    networks: 
+      - docker
     volumes:
       - /data/appdata/nzbget/config:/config
       - /data/downloads:/downloads
@@ -75,6 +81,8 @@ services:
   sonarr:
     image: linuxserver/sonarr
     container_name: sonarr
+    networks:
+      - docker
     depends_on:
       - nzbget
     volumes:
@@ -92,6 +100,8 @@ services:
   radarr:
     image: linuxserver/radarr
     container_name: radarr
+    networks: 
+      - docker
     depends_on:
       - nzbget
     volumes:
@@ -104,3 +114,7 @@ services:
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
+
+networks:
+  docker:
+    driver: bridge
