@@ -1,0 +1,106 @@
+---
+version: '3'
+services:
+  plex:
+    image: plexinc/pms-docker
+    container_name: plex
+    volumes:
+      - /data/appdata/plex:/config
+      - /data/storage:/data
+    ports:
+      - 32400:32400/tcp
+      - 3005:3005/tcp
+      - 8324:8324/tcp
+      - 32469:32469/tcp
+      - 1900:1900/udp
+      - 32410:32410/udp
+      - 32412:32412/udp
+      - 32413:32413/udp
+      - 32414:32414/udp
+    restart: always
+    hostname: tower
+    environment:
+      - PLEX_CLAIM="claim-3Z6RJfhrL13pqdXUDdyK\"
+      - PUID=${PUID}
+      - PLEX_UID=${PUID}
+      - PGID=${PGID}
+      - PLEX_GID=${PGID}
+      - ADVERTISE_IP=http://192.168.0.50:32400/
+
+  tautulli:
+    image: tautulli/tautulli
+    container_name: tautulli
+    depends_on:
+      - plex
+    volumes:
+      - /data/appdata/tautulli:/config
+      - /data/appdata/plex/Library/Application\ Support/Plex\ Media\ Server/Logs:/logs:ro
+    ports:
+      - 8181:8181
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+
+  ombi:
+    image: linuxserver/ombi
+    container_name: ombi
+    depends_on:
+      - plex
+    volumes:
+      - /data/appdata/ombi:/config
+      - /data/storage/tv:/tv
+      - /data/storage/movies:/movies
+      - /data/storage/anime:/anime
+    ports:
+      - 3000:3000
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+
+  nzbget:
+    image: linuxserver/nzbget
+    container_name: nzbget
+    volumes:
+      - /data/appdata/nzbget/config:/config
+      - /data/downloads:/downloads
+    ports:
+      - 6789:6789
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+
+  sonarr:
+    image: linuxserver/sonarr
+    container_name: sonarr
+    depends_on:
+      - nzbget
+    volumes:
+      - /data/appdata/sonarr:/config
+      - /data/storage/tv:/tv
+      - /data/storage/anime:/anime
+      - /data/downloads:/downloads
+    ports:
+      - 8989:8989
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+
+  radarr:
+    image: linuxserver/radarr
+    container_name: radarr
+    depends_on:
+      - nzbget
+    volumes:
+      - /data/appdata/radarr:/config
+      - /data/storage/movies:/movies
+      - /data/downloads:/downloads
+    ports:
+      - 7878:7878
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
