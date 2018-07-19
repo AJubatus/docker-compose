@@ -22,7 +22,7 @@ services:
     restart: always
     hostname: tower
     environment:
-      - PLEX_CLAIM="claim-3Z6RJfhrL13pqdXUDdyK\"
+      - PLEX_CLAIM=${PLEXCLAIM}
       - PUID=${PUID}
       - PLEX_UID=${PUID}
       - PGID=${PGID}
@@ -43,6 +43,7 @@ services:
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
+      - TZ=Europe/Dublin
 
   ombi:
     image: linuxserver/ombi
@@ -114,6 +115,56 @@ services:
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
+
+###
+#Docker Related Stuff
+###
+
+  letsencrypt:
+    image: linuxserver/letsencrypt
+    container_name: letsencrypt
+    networks:
+      - docker
+    volumes:
+      - /data/appdata/letsencrypt:/config
+    ports:
+      - 80:80
+      - 443:443
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - EMAIL=${EMAIL}
+      - URL=${URL}
+      - SUBDOMAINS=wildcard
+      - VALIDATION=dns
+      - DNSPLUGIN=cloudflare
+
+  cloudflare-ddns:
+    image: joshuaavalon/cloudflare-ddns
+    container_name: cloudflare-ddns
+    networks:
+      - docker
+    restart: always
+    environment:
+      - ZONE=${URL}
+      - HOST=${CFHOST}
+      - API=${CFAPI}
+      - EMAIL=${EMAIL}
+
+  speedtest:
+    image: roest/docker-speedtest-analyser
+    container_name: speedtest
+    networks:
+      - docker
+    volumes:
+      - /data/appdata/speedtest:/var/www/html/data
+    restart: always
+    ports:
+      - 8080:80
+    environment:
+      - CRONJOB_ITERATION=20
+
 
 networks:
   docker:
