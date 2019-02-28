@@ -33,12 +33,14 @@ services:
     image: tautulli/tautulli
     container_name: tautulli
     networks:
-      -  docker
+      - docker
     depends_on:
       - plex
     volumes:
       - /data/appdata/tautulli:/config
-      - /data/appdata/plex/Library/Application\ Support/Plex\ Media\ Server/Logs:/logs:ro
+      - "/data/appdata/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro"
+    ports:
+      - 8181:8181/tcp
     restart: always
     environment:
       - PUID=${PUID}
@@ -108,6 +110,7 @@ services:
     volumes:
       - /data/appdata/radarr:/config
       - /data/storage/movies:/movies
+      - /data/storage/anime:/anime
       - /data/downloads:/downloads
     ports:
       - 7878:7878
@@ -140,17 +143,31 @@ services:
       - VALIDATION=dns
       - DNSPLUGIN=cloudflare
 
-  cloudflare-ddns:
-    image: joshuaavalon/cloudflare-ddns
-    container_name: cloudflare-ddns
+        #cloudflare-ddns:
+        #    image: joshuaavalon/cloudflare-ddns
+        #    container_name: cloudflare-ddns
+        #    networks:
+        #      - docker
+        #    restart: always
+        #    environment:
+        #      - ZONE=${URL}
+        #      - HOST=${CFHOST}
+        #      - API=${CFAPI}
+        #      - EMAIL=${EMAIL}
+
+  ddns-updater:
+    image: qmcgaw/ddns-updater
+    container_name: ddns-updater
     networks:
       - docker
-    restart: always
+    ports:
+      - 8000:8000/tcp
     environment:
-      - ZONE=${URL}
-      - HOST=${CFHOST}
-      - API=${CFAPI}
-      - EMAIL=${EMAIL}
+      - DELAY=300
+      - ROOTURL=/
+      - LISTENINGPORT=8000
+      - RECORD1=${DDNSRECORD1}
+      - RECORD2=${DDNSRECORD2}
 
   speedtest:
     image: roest/docker-speedtest-analyser
@@ -163,7 +180,7 @@ services:
     ports:
       - 8080:80
     environment:
-      - CRONJOB_ITERATION=20
+      - CRONJOB_ITERATION=10
 
 
 networks:
