@@ -2,23 +2,21 @@
 version: '3'
 services:
   plex:
-    image: plexinc/pms-docker
+    image: linuxserver/plex
     container_name: plex
     networks: 
       - docker
     volumes:
       - /data/appdata/plex:/config
       - /data/storage:/data
+      - /data/transcode:/transcode
     ports:
-      - 32400:32400/tcp
-      - 3005:3005/tcp
-      - 8324:8324/tcp
-      - 32469:32469/tcp
+      - 32400:32400
+      - 32400:32400/udp
+      - 32469:32469
+      - 32469:32469/udp
+      - 5353:5353/udp
       - 1900:1900/udp
-      - 32410:32410/udp
-      - 32412:32412/udp
-      - 32413:32413/udp
-      - 32414:32414/udp
     restart: always
     hostname: tower
     environment:
@@ -28,6 +26,7 @@ services:
       - PGID=${PGID}
       - PLEX_GID=${PGID}
       - ADVERTISE_IP=http://192.168.0.50:32400/
+      - VERSION=latest
 
   tautulli:
     image: tautulli/tautulli
@@ -139,9 +138,8 @@ services:
       - PGID=${PGID}
       - EMAIL=${EMAIL}
       - URL=${URL}
-      - SUBDOMAINS=wildcard
-      - VALIDATION=dns
-      - DNSPLUGIN=cloudflare
+      - SUBDOMAINS=www,sonarr,radarr,nzbget,ombi
+      - VALIDATION=http
 
         #cloudflare-ddns:
         #    image: joshuaavalon/cloudflare-ddns
