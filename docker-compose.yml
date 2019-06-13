@@ -20,7 +20,6 @@ services:
     restart: always
     hostname: tower
     environment:
-      - PLEX_CLAIM=${PLEXCLAIM}
       - PUID=${PUID}
       - PLEX_UID=${PUID}
       - PGID=${PGID}
@@ -141,31 +140,18 @@ services:
       - SUBDOMAINS=www,sonarr,radarr,nzbget,ombi
       - VALIDATION=http
 
-        #cloudflare-ddns:
-        #    image: joshuaavalon/cloudflare-ddns
-        #    container_name: cloudflare-ddns
-        #    networks:
-        #      - docker
-        #    restart: always
-        #    environment:
-        #      - ZONE=${URL}
-        #      - HOST=${CFHOST}
-        #      - API=${CFAPI}
-        #      - EMAIL=${EMAIL}
-
   ddns-updater:
     image: qmcgaw/ddns-updater
     container_name: ddns-updater
     networks:
       - docker
+    volumes:
+      - /data/appdata/ddnsupdater/data:/updater/data
     ports:
       - 8000:8000/tcp
     environment:
-      - DELAY=300
-      - ROOTURL=/
-      - LISTENINGPORT=8000
-      - RECORD1=${DDNSRECORD1}
-      - RECORD2=${DDNSRECORD2}
+      - PUID=${PUID}                                                                                            
+      - PGID=${PGID} 
 
   speedtest:
     image: roest/docker-speedtest-analyser
@@ -180,6 +166,12 @@ services:
     environment:
       - CRONJOB_ITERATION=10
 
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --cleanup --schedule "0 0 4 * * *"
 
 networks:
   docker:
