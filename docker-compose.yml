@@ -1,6 +1,11 @@
 ---
 version: '3'
 services:
+
+########
+# Plex #
+########
+
   plex:
     image: linuxserver/plex
     container_name: plex
@@ -64,6 +69,10 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
 
+#########
+# Media #
+#########
+
   nzbget:
     image: linuxserver/nzbget
     container_name: nzbget
@@ -117,9 +126,9 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
 
-###
-#Docker Related Stuff
-###
+###########
+# Network #
+###########
 
   letsencrypt:
     image: linuxserver/letsencrypt
@@ -149,6 +158,7 @@ services:
       - /data/appdata/ddnsupdater/data:/updater/data
     ports:
       - 8000:8000/tcp
+    restart: always
     environment:
       - PUID=${PUID}                                                                                            
       - PGID=${PGID} 
@@ -166,12 +176,43 @@ services:
     environment:
       - CRONJOB_ITERATION=10
 
+
+pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "67:67/udp"
+      - "80:8880/tcp"
+      - "443:8443/tcp"
+    environment:
+      TZ: 'Europe/Dublin'
+      # WEBPASSWORD: 'set a secure password here or it will be random'
+    # Volumes store your data between container upgrades
+    volumes:
+       - /data/appdata/pihole/:/etc/pihole/
+       - /data/appdata/pihole-dnsmasq.d/:/etc/dnsmasq.d/
+    dns:
+      - 127.0.0.1
+      - 1.1.1.1
+    # Recommended but not required (DHCP needs NET_ADMIN)
+    #   https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+##########
+# Docker #
+##########
+
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --cleanup --schedule "0 0 4 * * *"
+    restart: always
 
 networks:
   docker:
