@@ -177,19 +177,20 @@ services:
       - CRONJOB_ITERATION=10
 
 
-pihole:
-    container_name: pihole
+  pihole:
     image: pihole/pihole:latest
+    container_name: pihole
+    networks:
+      - docker
     ports:
       - "53:53/tcp"
       - "53:53/udp"
       - "67:67/udp"
-      - "80:8880/tcp"
-      - "443:8443/tcp"
+      - "8888:80/tcp"
+      - "8844:443/tcp"
     environment:
       TZ: 'Europe/Dublin'
-      # WEBPASSWORD: 'set a secure password here or it will be random'
-    # Volumes store your data between container upgrades
+      WEBPASSWORD: 'hunter2'
     volumes:
        - /data/appdata/pihole/:/etc/pihole/
        - /data/appdata/pihole-dnsmasq.d/:/etc/dnsmasq.d/
@@ -209,6 +210,8 @@ pihole:
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower
+    networks:
+      - docker
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --cleanup --schedule "0 0 4 * * *"
