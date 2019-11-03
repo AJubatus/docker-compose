@@ -3,6 +3,58 @@ version: '3'
 services:
 
 ########
+# Home #
+########
+
+  homeassistant:
+    container_name: homeassistant
+    image: homeassistant/home-assistant:stable
+    networks: 
+      - docker
+    volumes:
+      - /data/appdata/homeassistant:/config
+    ports:
+      - 8123:8123
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=Europe/Dublin
+    restart: always
+
+  node-red:
+    image: nodered/node-red:latest
+    container_name: node-red
+    networks:
+      - docker
+    #network_mode: host
+    user: root
+    volumes:
+      - /data/appdata/node-red:/data
+    ports:
+      - 1880:1880
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=Europe/Dublin
+    restart: always
+
+  mqtt:
+    container_name: mosquitto
+    image: eclipse-mosquitto:latest
+    networks: 
+      - docker
+    volumes:
+      - /data/appdata/mosquitto:/mosquitto
+    ports:
+      - 1883:1883
+      - 9001:9001
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=Europe/Dublin
+    restart: always
+
+#######
 # Plex #
 ########
 
@@ -146,7 +198,7 @@ services:
       - PGID=${PGID}
       - EMAIL=${EMAIL}
       - URL=${URL}
-      - SUBDOMAINS=www,sonarr,radarr,nzbget,ombi
+      - SUBDOMAINS=www,sonarr,radarr,nzbget,ombi,home
       - VALIDATION=http
 
   ddns-updater:
@@ -196,7 +248,7 @@ services:
        - /data/appdata/pihole-dnsmasq.d/:/etc/dnsmasq.d/
     dns:
       - 127.0.0.1
-      - 1.1.1.1
+      - 8.8.8.8
     # Recommended but not required (DHCP needs NET_ADMIN)
     #   https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
     cap_add:
