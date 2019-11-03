@@ -24,7 +24,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - {$APPDATA}/traefik/traefik.yml:/traefik.yml:ro
+      - ${APPDATA}/traefik/traefik.yml:/traefik.yml:ro
       - ${APPDATA}/traefik/acme.json:/acme.json
       - ${APPDATA}/traefik/config.yml:/config.yml:ro
       - ${APPDATA}/shared:/shared
