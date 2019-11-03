@@ -287,35 +287,64 @@ services:
   tautulli:
     image: tautulli/tautulli
     container_name: tautulli
+    restart: always
     depends_on:
       - plex
+    networks: 
+      - traefik_proxy
     volumes:
       - ${APPDATA}/tautulli:/config
       - "${APPDATA}/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro"
-    ports:
-      - 8181:8181/tcp
-    restart: always
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
-      - TZ=Europe/Dublin
+      - TZ=${TZ}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tautulli.entrypoints=http"
+      - "traefik.http.routers.tautulli.rule=Host(`tautulli.${DOMAIN}`)"
+      - "traefik.http.middlewares.tautulli-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.routers.tautulli.middlewares=https-redirect@file"
+      - "traefik.http.routers.tautulli-secure.middlewares=secured@file"
+      - "traefik.http.routers.tautulli-secure.entrypoints=https"
+      - "traefik.http.routers.tautulli-secure.rule=Host(`tautulli.${DOMAIN}`)"
+      - "traefik.http.routers.tautulli-secure.tls=true"
+      - "traefik.http.routers.tautulli-secure.tls.certresolver=http"
+      - "traefik.http.routers.tautulli-secure.service=tautulli"
+      - "traefik.http.services.tautulli.loadbalancer.server.port=8181"
+      - "traefik.docker.network=traefik_proxy"
 
   ombi:
     image: linuxserver/ombi
     container_name: ombi
+    restart: always
     depends_on:
       - plex
+    networks: 
+      - traefik_proxy
     volumes:
       - ${APPDATA}/ombi:/config
       - /data/storage/tv:/tv
       - /data/storage/movies:/movies
       - /data/storage/anime:/anime
-    ports:
-      - 3579:3579
-    restart: always
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
+      - TZ=${TZ}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ombi.entrypoints=http"
+      - "traefik.http.routers.ombi.rule=Host(`ombi.${DOMAIN}`)"
+      #- "traefik.http.middlewares.ombi-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.routers.ombi.middlewares=https-redirect@file"
+      - "traefik.http.routers.ombi-secure.middlewares=secured@file"
+      - "traefik.http.routers.ombi-secure.entrypoints=https"
+      - "traefik.http.routers.ombi-secure.rule=Host(`ombi.${DOMAIN}`)"
+      - "traefik.http.routers.ombi-secure.tls=true"
+      - "traefik.http.routers.ombi-secure.tls.certresolver=http"
+      - "traefik.http.routers.ombi-secure.service=ombi"
+      - "traefik.http.services.ombi.loadbalancer.server.port=3579"
+      - "traefik.docker.network=traefik_proxy"
 
 #########
 # Media #
@@ -324,12 +353,13 @@ services:
   nzbget:
     image: linuxserver/nzbget
     container_name: nzbget
+    restart: always
+    networks: 
+      - traefik_proxy
     volumes:
       - ${APPDATA}/nzbget/config:/config
       - /data/downloads:/downloads
-    ports:
-      - 6789:6789
-    restart: always
+
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -339,28 +369,28 @@ services:
       - "traefik.http.routers.nzbget.rule=Host(`nzbget.${DOMAIN}`)"
       #- "traefik.http.middlewares.nzbget-auth.basicauth.usersfile=/shared/.htpasswd"
       - "traefik.http.routers.nzbget.middlewares=https-redirect@file"
-      #- "traefik.http.routers.nzbget-secure.middlewares=secured@file"
+      - "traefik.http.routers.nzbget-secure.middlewares=secured@file"
       - "traefik.http.routers.nzbget-secure.entrypoints=https"
       - "traefik.http.routers.nzbget-secure.rule=Host(`nzbget.${DOMAIN}`)"
       - "traefik.http.routers.nzbget-secure.tls=true"
       - "traefik.http.routers.nzbget-secure.tls.certresolver=http"
       - "traefik.http.routers.nzbget-secure.service=nzbget"
-      - "traefik.http.services.nzbget.loadbalancer.server.port=8989"
+      - "traefik.http.services.nzbget.loadbalancer.server.port=6789"
       - "traefik.docker.network=traefik_proxy"
 
   sonarr:
     image: linuxserver/sonarr
     container_name: sonarr
+    restart: always
     depends_on:
       - nzbget
+    networks: 
+      - traefik_proxy
     volumes:
       - ${APPDATA}/sonarr:/config
       - /data/storage/tv:/tv
       - /data/storage/anime:/anime
       - /data/downloads:/downloads
-    ports:
-      - 8989:8989
-    restart: always
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -370,7 +400,7 @@ services:
       - "traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)"
       #- "traefik.http.middlewares.sonarr-auth.basicauth.usersfile=/shared/.htpasswd"
       - "traefik.http.routers.sonarr.middlewares=https-redirect@file"
-      #- "traefik.http.routers.sonarr-secure.middlewares=secured@file"
+      - "traefik.http.routers.sonarr-secure.middlewares=secured@file"
       - "traefik.http.routers.sonarr-secure.entrypoints=https"
       - "traefik.http.routers.sonarr-secure.rule=Host(`sonarr.${DOMAIN}`)"
       - "traefik.http.routers.sonarr-secure.tls=true"
@@ -382,16 +412,15 @@ services:
   radarr:
     image: linuxserver/radarr
     container_name: radarr
+    restart: always
     depends_on:
       - nzbget
+    networks: 
+      - traefik_proxy
     volumes:
       - ${APPDATA}/radarr:/config
       - /data/storage/movies:/movies
       - /data/storage/anime:/anime
-      - /data/downloads:/downloads
-    ports:
-      - 7878:7878
-    restart: always
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -401,7 +430,7 @@ services:
       - "traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`)"
       #- "traefik.http.middlewares.radarr-auth.basicauth.usersfile=/shared/.htpasswd"
       - "traefik.http.routers.radarr.middlewares=https-redirect@file"
-      #- "traefik.http.routers.radarr-secure.middlewares=secured@file"
+      - "traefik.http.routers.radarr-secure.middlewares=secured@file"
       - "traefik.http.routers.radarr-secure.entrypoints=https"
       - "traefik.http.routers.radarr-secure.rule=Host(`radarr.${DOMAIN}`)"
       - "traefik.http.routers.radarr-secure.tls=true"
