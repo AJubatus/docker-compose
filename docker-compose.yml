@@ -1,58 +1,253 @@
 ---
 version: '3'
+
+networks:
+  traefik_proxy:
+    external:
+      name: traefik_proxy
+  default:
+    driver: bridge
+
 services:
+
+  traefik:
+    image: traefik:v2.0
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik_proxy
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - {$APPDATA}/traefik/traefik.yml:/traefik.yml:ro
+      - ${APPDATA}/traefik/acme.json:/acme.json
+      - ${APPDATA}/traefik/config.yml:/config.yml:ro
+      - ${APPDATA}/shared:/shared
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.entrypoints=http"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.middlewares.traefik-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.traefik.middlewares=traefik-https-redirect"
+      - "traefik.http.routers.traefik-secure.entrypoints=https"
+      - "traefik.http.routers.traefik-secure.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik-secure.middlewares=traefik-auth"
+      - "traefik.http.routers.traefik-secure.tls=true"
+      - "traefik.http.routers.traefik-secure.tls.certresolver=http"
+      - "traefik.http.routers.traefik-secure.service=api@internal"
+
+  portainer:
+    image: portainer/portainer:latest
+    container_name: portainer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik_proxy
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.entrypoints=http"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.${DOMAIN}`)"
+      - "traefik.http.middlewares.portainer-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.middlewares.portainer-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.portainer.middlewares=https-redirect@file"
+      - "traefik.http.routers.portainer-secure.middlewares=secured@file"
+      - "traefik.http.routers.portainer-secure.entrypoints=https"
+      - "traefik.http.routers.portainer-secure.rule=Host(`portainer.${DOMAIN}`)"
+      - "traefik.http.routers.portainer-secure.tls=true"
+      - "traefik.http.routers.portainer-secure.tls.certresolver=http"
+      - "traefik.http.routers.portainer-secure.service=portainer"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+      - "traefik.docker.network=traefik_proxy"
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: always
+    command: --cleanup --schedule "0 0 4 * * *"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  ddns-updater:
+    image: qmcgaw/ddns-updater
+    container_name: ddns-updater
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    volumes:
+      - ${APPDATA}/ddnsupdater/data:/updater/data
+    environment:
+      - PUID=${PUID}                                                                                            
+      - PGID=${PGID}
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ddns.entrypoints=http"
+      - "traefik.http.routers.ddns.rule=Host(`ddns.${DOMAIN}`)"
+      - "traefik.http.middlewares.ddns-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.middlewares.ddns-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.ddns.middlewares=https-redirect@file"
+      - "traefik.http.routers.ddns-secure.middlewares=secured@file"
+      - "traefik.http.routers.ddns-secure.entrypoints=https"
+      - "traefik.http.routers.ddns-secure.rule=Host(`ddns.${DOMAIN}`)"
+      - "traefik.http.routers.ddns-secure.tls=true"
+      - "traefik.http.routers.ddns-secure.tls.certresolver=http"
+      - "traefik.http.routers.ddns-secure.service=ddns"
+      - "traefik.http.services.ddns.loadbalancer.server.port=8000"
+      - "traefik.docker.network=traefik_proxy"
+
+  speedtest:
+    image: roest/docker-speedtest-analyser
+    container_name: speedtest
+    restart: unless-stopped
+    volumes:
+      - ${APPDATA}/speedtest:/var/www/html/data
+    environment:
+      - CRONJOB_ITERATION=10
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.speedtest.entrypoints=http"
+      - "traefik.http.routers.speedtest.rule=Host(`speedtest.${DOMAIN}`)"
+      - "traefik.http.middlewares.speedtest-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.middlewares.speedtest-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.speedtest.middlewares=https-redirect@file"
+      - "traefik.http.routers.speedtest-secure.middlewares=secured@file"
+      - "traefik.http.routers.speedtest-secure.entrypoints=https"
+      - "traefik.http.routers.speedtest-secure.rule=Host(`speedtest.${DOMAIN}`)"
+      - "traefik.http.routers.speedtest-secure.tls=true"
+      - "traefik.http.routers.speedtest-secure.tls.certresolver=http"
+      - "traefik.http.routers.speedtest-secure.service=speedtest"
+      - "traefik.http.services.speedtest.loadbalancer.server.port=80"
+      - "traefik.docker.network=traefik_proxy"
+
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    networks:
+      - traefik_proxy
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    environment:
+      - ServerIP=192.168.0.50
+      - PROXY_LOCATION=pihole
+      - VIRTUAL_HOST=pihole.${DOMAIN}
+      - VIRTUAL_PORT=80
+      - TZ=${TZ}
+      - WEBPASSWORD=hunter2
+      - DNS1=127.0.0.1
+      - DNS2=1.1.1.1
+    volumes:
+       - ${APPDATA}/pihole/:/etc/pihole/
+       - ${APPDATA}/pihole-dnsmasq.d/:/etc/dnsmasq.d/
+    cap_add:
+      - NET_ADMIN
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pihole.entrypoints=http"
+      - "traefik.http.routers.pihole.rule=Host(`pihole.${DOMAIN}`)"
+      - "traefik.http.middlewares.pihole-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.middlewares.pihole-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.pihole.middlewares=https-redirect@file"
+      - "traefik.http.routers.pihole-secure.middlewares=secured@file"
+      - "traefik.http.routers.pihole-secure.entrypoints=https"
+      - "traefik.http.routers.pihole-secure.rule=Host(`pihole.${DOMAIN}`)"
+      - "traefik.http.routers.pihole-secure.tls=true"
+      - "traefik.http.routers.pihole-secure.tls.certresolver=http"
+      - "traefik.http.routers.pihole-secure.service=pihole"
+      - "traefik.http.services.pihole.loadbalancer.server.port=80"
+      - "traefik.docker.network=traefik_proxy"
+
 
 ########
 # Home #
 ########
 
   homeassistant:
-    container_name: homeassistant
     image: homeassistant/home-assistant:stable
+    container_name: homeassistant
+    restart: unless-stopped
     networks: 
-      - docker
+      - traefik_proxy
     volumes:
-      - /data/appdata/homeassistant:/config
-    ports:
-      - 8123:8123
+      - ${APPDATA}/homeassistant:/config
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
-      - TZ=Europe/Dublin
-    restart: always
+      - TZ=${TZ} 
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homeassistant.entrypoints=http"
+      - "traefik.http.routers.homeassistant.rule=Host(`home.${DOMAIN}`)"
+      - "traefik.http.middlewares.homeassistant-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.middlewares.homeassistant-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.homeassistant.middlewares=https-redirect@file"
+      - "traefik.http.routers.homeassistant-secure.middlewares=secured@file"
+      - "traefik.http.routers.homeassistant-secure.entrypoints=https"
+      - "traefik.http.routers.homeassistant-secure.rule=Host(`home.${DOMAIN}`)"
+      - "traefik.http.routers.homeassistant-secure.tls=true"
+      - "traefik.http.routers.homeassistant-secure.tls.certresolver=http"
+      - "traefik.http.routers.homeassistant-secure.service=homeassistant"
+      - "traefik.http.services.homeassistant.loadbalancer.server.port=8123"
+      - "traefik.docker.network=traefik_proxy"
 
   node-red:
     image: nodered/node-red:latest
     container_name: node-red
+    restart: unless-stopped
     networks:
-      - docker
-    #network_mode: host
+      - traefik_proxy
     user: root
     volumes:
-      - /data/appdata/node-red:/data
-    ports:
-      - 1880:1880
+      - ${APPDATA}/node-red:/data
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
-      - TZ=Europe/Dublin
-    restart: always
+      - TZ=${TZ}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nodered.entrypoints=http"
+      - "traefik.http.routers.nodered.rule=Host(`nodered.${DOMAIN}`)"
+      - "traefik.http.middlewares.nodered-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.middlewares.nodered-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.nodered.middlewares=https-redirect@file"
+      - "traefik.http.routers.nodered-secure.middlewares=secured@file"
+      - "traefik.http.routers.nodered-secure.entrypoints=https"
+      - "traefik.http.routers.nodered-secure.rule=Host(`home.${DOMAIN}`)"
+      - "traefik.http.routers.nodered-secure.tls=true"
+      - "traefik.http.routers.nodered-secure.tls.certresolver=http"
+      - "traefik.http.routers.nodered-secure.service=nodered"
+      - "traefik.http.services.nodered.loadbalancer.server.port=1880"
+      - "traefik.docker.network=traefik_proxy"
 
   mqtt:
-    container_name: mosquitto
     image: eclipse-mosquitto:latest
-    networks: 
-      - docker
+    container_name: mosquitto
+    restart: unless-stopped
     volumes:
-      - /data/appdata/mosquitto:/mosquitto
+      - ${APPDATA}/mosquitto:/mosquitto
     ports:
       - 1883:1883
       - 9001:9001
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
-      - TZ=Europe/Dublin
-    restart: always
+      - TZ=${TZ}
+
 
 #######
 # Plex #
@@ -62,20 +257,17 @@ services:
     image: linuxserver/plex
     container_name: plex
     networks: 
-      - docker
+      - traefik_proxy
     volumes:
-      - /data/appdata/plex:/config
+      - ${APPDATA}/plex:/config
       - /data/storage:/data
       - /data/transcode:/transcode
     ports:
-      - 32400:32400
-      - 32400:32400/udp
       - 32469:32469
       - 32469:32469/udp
       - 5353:5353/udp
       - 1900:1900/udp
     restart: always
-    hostname: tower
     environment:
       - PUID=${PUID}
       - PLEX_UID=${PUID}
@@ -83,17 +275,30 @@ services:
       - PLEX_GID=${PGID}
       - ADVERTISE_IP=http://192.168.0.50:32400/
       - VERSION=latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.plex.entrypoints=http"
+      - "traefik.http.routers.plex.rule=Host(`plex.${DOMAIN}`)"
+      - "traefik.http.middlewares.plex-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.middlewares.plex-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.plex.middlewares=https-redirect@file"
+      - "traefik.http.routers.plex-secure.middlewares=secured@file"
+      - "traefik.http.routers.plex-secure.entrypoints=https"
+      - "traefik.http.routers.plex-secure.rule=Host(`home.${DOMAIN}`)"
+      - "traefik.http.routers.plex-secure.tls=true"
+      - "traefik.http.routers.plex-secure.tls.certresolver=http"
+      - "traefik.http.routers.plex-secure.service=plex"
+      - "traefik.http.services.plex.loadbalancer.server.port=32400"
+      - "traefik.docker.network=traefik_proxy"
 
   tautulli:
     image: tautulli/tautulli
     container_name: tautulli
-    networks:
-      - docker
     depends_on:
       - plex
     volumes:
-      - /data/appdata/tautulli:/config
-      - "/data/appdata/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro"
+      - ${APPDATA}/tautulli:/config
+      - "${APPDATA}/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro"
     ports:
       - 8181:8181/tcp
     restart: always
@@ -105,12 +310,10 @@ services:
   ombi:
     image: linuxserver/ombi
     container_name: ombi
-    networks: 
-      - docker
     depends_on:
       - plex
     volumes:
-      - /data/appdata/ombi:/config
+      - ${APPDATA}/ombi:/config
       - /data/storage/tv:/tv
       - /data/storage/movies:/movies
       - /data/storage/anime:/anime
@@ -128,10 +331,8 @@ services:
   nzbget:
     image: linuxserver/nzbget
     container_name: nzbget
-    networks: 
-      - docker
     volumes:
-      - /data/appdata/nzbget/config:/config
+      - ${APPDATA}/nzbget/config:/config
       - /data/downloads:/downloads
     ports:
       - 6789:6789
@@ -143,12 +344,10 @@ services:
   sonarr:
     image: linuxserver/sonarr
     container_name: sonarr
-    networks:
-      - docker
     depends_on:
       - nzbget
     volumes:
-      - /data/appdata/sonarr:/config
+      - ${APPDATA}/sonarr:/config
       - /data/storage/tv:/tv
       - /data/storage/anime:/anime
       - /data/downloads:/downloads
@@ -158,16 +357,29 @@ services:
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sonarr.entrypoints=http"
+      - "traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)"
+      - "traefik.http.middlewares.sonarr-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.middlewares.sonarr-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.sonarr.middlewares=https-redirect@file"
+      - "traefik.http.routers.sonarr-secure.middlewares=secured@file"
+      - "traefik.http.routers.sonarr-secure.entrypoints=https"
+      - "traefik.http.routers.sonarr-secure.rule=Host(`home.${DOMAIN}`)"
+      - "traefik.http.routers.sonarr-secure.tls=true"
+      - "traefik.http.routers.sonarr-secure.tls.certresolver=http"
+      - "traefik.http.routers.sonarr-secure.service=sonarr"
+      - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
+      - "traefik.docker.network=traefik_proxy"
 
   radarr:
     image: linuxserver/radarr
     container_name: radarr
-    networks: 
-      - docker
     depends_on:
       - nzbget
     volumes:
-      - /data/appdata/radarr:/config
+      - ${APPDATA}/radarr:/config
       - /data/storage/movies:/movies
       - /data/storage/anime:/anime
       - /data/downloads:/downloads
@@ -177,98 +389,20 @@ services:
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
-
-###########
-# Network #
-###########
-
-  letsencrypt:
-    image: linuxserver/letsencrypt
-    container_name: letsencrypt
-    networks:
-      - docker
-    volumes:
-      - /data/appdata/letsencrypt:/config
-    ports:
-      - 80:80
-      - 443:443
-    restart: always
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - EMAIL=${EMAIL}
-      - URL=${URL}
-      - SUBDOMAINS=www,sonarr,radarr,nzbget,ombi,home
-      - VALIDATION=http
-
-  ddns-updater:
-    image: qmcgaw/ddns-updater
-    container_name: ddns-updater
-    networks:
-      - docker
-    volumes:
-      - /data/appdata/ddnsupdater/data:/updater/data
-    ports:
-      - 8000:8000/tcp
-    restart: always
-    environment:
-      - PUID=${PUID}                                                                                            
-      - PGID=${PGID} 
-
-  speedtest:
-    image: roest/docker-speedtest-analyser
-    container_name: speedtest
-    networks:
-      - docker
-    volumes:
-      - /data/appdata/speedtest:/var/www/html/data
-    restart: always
-    ports:
-      - 8080:80
-    environment:
-      - CRONJOB_ITERATION=10
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.radarr.entrypoints=http"
+      - "traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`)"
+      - "traefik.http.middlewares.radarr-auth.basicauth.usersfile=/shared/.htpasswd"
+      - "traefik.http.middlewares.radarr-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.radarr.middlewares=https-redirect@file"
+      - "traefik.http.routers.radarr-secure.middlewares=secured@file"
+      - "traefik.http.routers.radarr-secure.entrypoints=https"
+      - "traefik.http.routers.radarr-secure.rule=Host(`home.${DOMAIN}`)"
+      - "traefik.http.routers.radarr-secure.tls=true"
+      - "traefik.http.routers.radarr-secure.tls.certresolver=http"
+      - "traefik.http.routers.radarr-secure.service=radarr"
+      - "traefik.http.services.radarr.loadbalancer.server.port=7878"
+      - "traefik.docker.network=traefik_proxy"
 
 
-  pihole:
-    image: pihole/pihole:latest
-    container_name: pihole
-    networks:
-      - docker
-    ports:
-      - "53:53/tcp"
-      - "53:53/udp"
-      - "67:67/udp"
-      - "8888:80/tcp"
-      - "8844:443/tcp"
-    environment:
-      TZ: 'Europe/Dublin'
-      WEBPASSWORD: 'hunter2'
-    volumes:
-       - /data/appdata/pihole/:/etc/pihole/
-       - /data/appdata/pihole-dnsmasq.d/:/etc/dnsmasq.d/
-    dns:
-      - 127.0.0.1
-      - 8.8.8.8
-    # Recommended but not required (DHCP needs NET_ADMIN)
-    #   https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
-    cap_add:
-      - NET_ADMIN
-    restart: unless-stopped
-
-##########
-# Docker #
-##########
-
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower
-    networks:
-      - docker
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --cleanup --schedule "0 0 4 * * *"
-    restart: always
-
-networks:
-  docker:
-    driver: bridge

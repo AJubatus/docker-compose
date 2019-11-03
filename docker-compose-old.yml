@@ -1,0 +1,274 @@
+---
+version: '3'
+services:
+
+########
+# Home #
+########
+
+  homeassistant:
+    container_name: homeassistant
+    image: homeassistant/home-assistant:stable
+    networks: 
+      - docker
+    volumes:
+      - /data/appdata/homeassistant:/config
+    ports:
+      - 8123:8123
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=Europe/Dublin
+    restart: always
+
+  node-red:
+    image: nodered/node-red:latest
+    container_name: node-red
+    networks:
+      - docker
+    #network_mode: host
+    user: root
+    volumes:
+      - /data/appdata/node-red:/data
+    ports:
+      - 1880:1880
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=Europe/Dublin
+    restart: always
+
+  mqtt:
+    container_name: mosquitto
+    image: eclipse-mosquitto:latest
+    networks: 
+      - docker
+    volumes:
+      - /data/appdata/mosquitto:/mosquitto
+    ports:
+      - 1883:1883
+      - 9001:9001
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=Europe/Dublin
+    restart: always
+
+#######
+# Plex #
+########
+
+  plex:
+    image: linuxserver/plex
+    container_name: plex
+    networks: 
+      - docker
+    volumes:
+      - /data/appdata/plex:/config
+      - /data/storage:/data
+      - /data/transcode:/transcode
+    ports:
+      - 32400:32400
+      - 32400:32400/udp
+      - 32469:32469
+      - 32469:32469/udp
+      - 5353:5353/udp
+      - 1900:1900/udp
+    restart: always
+    hostname: tower
+    environment:
+      - PUID=${PUID}
+      - PLEX_UID=${PUID}
+      - PGID=${PGID}
+      - PLEX_GID=${PGID}
+      - ADVERTISE_IP=http://192.168.0.50:32400/
+      - VERSION=latest
+
+  tautulli:
+    image: tautulli/tautulli
+    container_name: tautulli
+    networks:
+      - docker
+    depends_on:
+      - plex
+    volumes:
+      - /data/appdata/tautulli:/config
+      - "/data/appdata/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro"
+    ports:
+      - 8181:8181/tcp
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=Europe/Dublin
+
+  ombi:
+    image: linuxserver/ombi
+    container_name: ombi
+    networks: 
+      - docker
+    depends_on:
+      - plex
+    volumes:
+      - /data/appdata/ombi:/config
+      - /data/storage/tv:/tv
+      - /data/storage/movies:/movies
+      - /data/storage/anime:/anime
+    ports:
+      - 3579:3579
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+
+#########
+# Media #
+#########
+
+  nzbget:
+    image: linuxserver/nzbget
+    container_name: nzbget
+    networks: 
+      - docker
+    volumes:
+      - /data/appdata/nzbget/config:/config
+      - /data/downloads:/downloads
+    ports:
+      - 6789:6789
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+
+  sonarr:
+    image: linuxserver/sonarr
+    container_name: sonarr
+    networks:
+      - docker
+    depends_on:
+      - nzbget
+    volumes:
+      - /data/appdata/sonarr:/config
+      - /data/storage/tv:/tv
+      - /data/storage/anime:/anime
+      - /data/downloads:/downloads
+    ports:
+      - 8989:8989
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+
+  radarr:
+    image: linuxserver/radarr
+    container_name: radarr
+    networks: 
+      - docker
+    depends_on:
+      - nzbget
+    volumes:
+      - /data/appdata/radarr:/config
+      - /data/storage/movies:/movies
+      - /data/storage/anime:/anime
+      - /data/downloads:/downloads
+    ports:
+      - 7878:7878
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+
+###########
+# Network #
+###########
+
+  letsencrypt:
+    image: linuxserver/letsencrypt
+    container_name: letsencrypt
+    networks:
+      - docker
+    volumes:
+      - /data/appdata/letsencrypt:/config
+    ports:
+      - 80:80
+      - 443:443
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - EMAIL=${EMAIL}
+      - URL=${URL}
+      - SUBDOMAINS=www,sonarr,radarr,nzbget,ombi,home
+      - VALIDATION=http
+
+  ddns-updater:
+    image: qmcgaw/ddns-updater
+    container_name: ddns-updater
+    networks:
+      - docker
+    volumes:
+      - /data/appdata/ddnsupdater/data:/updater/data
+    ports:
+      - 8000:8000/tcp
+    restart: always
+    environment:
+      - PUID=${PUID}                                                                                            
+      - PGID=${PGID} 
+
+  speedtest:
+    image: roest/docker-speedtest-analyser
+    container_name: speedtest
+    networks:
+      - docker
+    volumes:
+      - /data/appdata/speedtest:/var/www/html/data
+    restart: always
+    ports:
+      - 8080:80
+    environment:
+      - CRONJOB_ITERATION=10
+
+
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    networks:
+      - docker
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "67:67/udp"
+      - "8888:80/tcp"
+      - "8844:443/tcp"
+    environment:
+      TZ: 'Europe/Dublin'
+      WEBPASSWORD: 'hunter2'
+    volumes:
+       - /data/appdata/pihole/:/etc/pihole/
+       - /data/appdata/pihole-dnsmasq.d/:/etc/dnsmasq.d/
+    dns:
+      - 127.0.0.1
+      - 8.8.8.8
+    # Recommended but not required (DHCP needs NET_ADMIN)
+    #   https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+##########
+# Docker #
+##########
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    networks:
+      - docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --cleanup --schedule "0 0 4 * * *"
+    restart: always
+
+networks:
+  docker:
+    driver: bridge
